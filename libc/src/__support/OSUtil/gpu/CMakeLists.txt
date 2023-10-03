@@ -1,9 +1,0 @@
-add_object_library(
-  gpu_util
-  SRCS
-    quick_exit.cpp
-  HDRS
-    quick_exit.h
-  DEPENDS
-    libc.src.__support.common
-)
