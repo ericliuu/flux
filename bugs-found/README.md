@@ -4,8 +4,6 @@ A collection of all bugs that FLUX has discovered in LLVM's mid-end optimization
 - **Miscompilation**: Incorrect executable code is silently generated from a correct LLVM IR program
 - **LLVM ERROR**: The optimizer transforms a correct LLVM IR program into an invalid state, which crashes the optimizer.
 
-## Trophy Case
-
 |Filename|Bug Type|Optimization|GitHub Issue|Fixed|
 |---|---|---|---|---|
 |cvp1.ll|Miscompilation|CorrelatedValuePropagation|[link](https://github.com/llvm/llvm-project/issues/62200)|✅|
