@@ -16,14 +16,18 @@ For a technical description of FLUX's crossovers, please refer to our [ASE2023 p
 ## Collecting Unit Tests for Fuzzing
 
 We provide a script that collects all LLVM transformation unit tests into a single directory which can be passed into libFuzzer as a corpus.
-The script uses `llvm-extract` and `llvm-as` and an easy way to acquire these is to just build LLVM.
+The script uses `llvm-extract` and `llvm-as` and an easy way to acquire these binaries is to build LLVM.
 To use the script enter the following steps from the root of the git repo:
 
 ```bash
 > cd FLUX
 > mkdir build
 > cd build
-> cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DLLVM_USE_LINKER=lld -DLLVM_ENABLE_PROJECTS="clang;compiler-rt" ../llvm
+> cmake -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DLLVM_USE_LINKER=lld \
+        -DLLVM_ENABLE_PROJECTS="clang;compiler-rt" \
+        ../llvm
 > ninja
 > cd ../../
 > python3 scripts/collect_unittest_functions.py 
@@ -34,9 +38,9 @@ The script will generate four subdirectories in the `unit-tests` directory. The 
 
 ## Building FLUX
 
-To build FLUX for fuzzing LLVM optimizations, we will need to compile LLVM with a version of `clang` and `clang++` that support compiler-rt libraries.
-Luckily if you followed the build instructions in the "Collecting Unit Tests for Fuzzing", we will already have these binaries.
-To build `llvm-opt-fuzzer run the following from the root of the git repo:
+To build FLUX for fuzzing LLVM optimizations, we will need to compile LLVM with a version of `clang` and `clang++` that contain FLUX's changes on LLVM's compiler-rt libraries.
+Luckily if you followed the build instructions in the "Collecting Unit Tests for Fuzzing" section, we will already have these binaries.
+To build `llvm-opt-fuzzer` that is linked with the version of LLVM that FLUX is built on, run the following from the root of the git repo:
 
 ```bash
 > cd FLUX
@@ -44,8 +48,13 @@ To build `llvm-opt-fuzzer run the following from the root of the git repo:
 > cd build-fuzz
 > CC=[Path to flux]/flux/FLUX/build/bin/clang \
   CXX=[Path to flux]/flux/FLUX/build/bin/clang++ \
+  CFLAGS="-fsanitize-coverage=edge,inline-8bit-counters,no-prune \
+          -fno-sanitize-coverage=trace-cmp,trace-div,bb,func,trace-pc-guard,trace-pc,indirect-calls,pc-table" \
+  CXXFLAGS="-fsanitize-coverage=edge,inline-8bit-counters,no-prune \
+          -fno-sanitize-coverage=trace-cmp,trace-div,bb,func,trace-pc-guard,trace-pc,indirect-calls,pc-table" \
   cmake -G Ninja \
         -DCMAKE_BUILD_TYPE=Release \
+        -DLLVM_ENABLE_ASSERTIONS=On \
         -DLLVM_BUILD_RUNTIME=Off \
         -DLLVM_USE_SANITIZE_COVERAGE=On \
         -DLLVM_USE_LINKER=lld \
@@ -53,19 +62,39 @@ To build `llvm-opt-fuzzer run the following from the root of the git repo:
 > ninja llvm-opt-fuzzer
 ```
 
-## Running FLUX
+Note that we enable SanitizerCoverage's 8bit-counters as a loose proxy for path coverage.
 
-To fuzz LLVM optimization, we use can use the `llvm-opt-fuzzer` in same manner as specified in the LLVM docs: https://llvm.org/docs/FuzzingLLVM.html#llvm-opt-fuzzer.
-The only extra flag needed is `-cross_over=1`, which is required to activates FLUX's crossovers:
+To test other versions of LLVM you will need to build and link another `llvm-opt-fuzzer` with FLUX for each respective version of LLVM.
+The steps would be the same as the above example, but instead of building the version of LLVM in the FLUX directory, you will need to clone
+and create a build directory in your LLVM version of choice. I.e.:
 
 ```bash
-> FLUX/build-fuzz/bin/llvm-opt-fuzzer <corpus-dir> -cross_over=1 -ignore_remaining_args=1 -mtriple x86_64 -passes instcombine
+> git clone https://github.com/llvm/llvm-project.git
+> cd llvm-project
+> git checkout release/17.x
+> mkdir build-fuzz
+> [same steps as above]
+```
+
+Note that FLUX has only been tested on versions 16 and 17 of LLVM, so compatibility with other versions is not guaranteed.
+
+## Running FLUX
+
+To fuzz LLVM optimizations, we use can use `llvm-opt-fuzzer` in same manner as specified in the LLVM docs: https://llvm.org/docs/FuzzingLLVM.html#llvm-opt-fuzzer.
+The only extra flag needed is `-cross_over=1`, which is required to activate FLUX's crossovers:
+
+```bash
+> FLUX/build-fuzz/bin/llvm-opt-fuzzer <corpus-dir> \
+                                      -cross_over=1 \
+                                      -ignore_remaining_args=1 \
+                                      -mtriple x86_64 \
+                                      -passes instcombine
 ```
 
 Note that the `<corpus-dir>` must be comprised of LLVM bitcode files.
 
 
-### fuzzer_runner.py script
+### `fuzzer_runner.py` script
 
 During our evaluation, we observed that FLUX frequently found many of the same crashes which was tedious to deduplicate.
 Because of this, we also provide a script that runs `llvm-opt-fuzzer` and automatically deduplicates crashes based on specified input directories.
@@ -75,7 +104,10 @@ To use this script, we will need to build LLVM a third time to generate a versio
 > cd FLUX
 > mkdir build-debug
 > cd build-debug
-> cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DLLVM_USE_LINKER=lld ../llvm
+> cmake -G Ninja \
+        -DCMAKE_BUILD_TYPE=Debug \
+        -DLLVM_USE_LINKER=lld \
+        ../llvm
 > ninja opt
 ```
 
@@ -90,14 +122,18 @@ python3 scripts/fuzzer_runner.py --help
 #### Example usage:
 
 ```bash
-> mkdir -p fuzzer_output_dirs/crashes fuzzer_output_dirs/output fuzzer_output_dirs/seeds fuzzer_output_dirs/new_crashes
+> mkdir -p fuzzer_output_dirs/crashes \
+           fuzzer_output_dirs/output \
+           fuzzer_output_dirs/new_crashes \
+           fuzzer_output_dirs/seeds
+> cp unit-tests/ll_functions/InstCombine___* fuzzer_output_dirs/seeds
 > python3 scripts/fuzzer_runner.py \
           FLUX/build-fuzz/bin/llvm-opt-fuzzer \
           FLUX/build-debug/bin/opt \
           fuzzer_output_dirs/crashes \
           fuzzer_output_dirs/output \
-          fuzzer_output_dirs/seeds \
           fuzzer_output_dirs/new_crashes \
+          fuzzer_output_dirs/seeds \
           x86_64 \
           "default<O3>"
 ```
