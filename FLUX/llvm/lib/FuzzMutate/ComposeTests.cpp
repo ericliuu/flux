@@ -451,8 +451,8 @@ bool FunctionCombiner::linkFunctionInto(Function *Func, Function **FuncPtr,
     else
       llvm_unreachable("Function must come from either DestM or SrcM!");
   }
-  Function *KeepFunc = FuncMod->getFunction(Func->getName());
-  assert(KeepFunc && "No function with that name was found!");
+  // Function *KeepFunc = FuncMod->getFunction(Func->getName());
+  // assert(KeepFunc && "No function with that name was found!");
   // cleanModule(*FuncMod, KeepFunc);
 
   // Make the datalayouts consistent. Randomly select the resultant layout
