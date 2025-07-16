@@ -34,7 +34,7 @@ To use the script enter the following steps from the root of the git repo:
 ```
 
 By default, the script reads from the unit tests located in the `FLUX` subdirectory, but this can be easily changed by specifying a different path in the above script.
-The script will generate four subdirectories in the `unit-tests` directory. The `ll-{files,functions}` directories hold the original unit tests and the unit tests with each individual function extracted into its own file, respectively. The `bc-{files,functions}` directories hold the compiled results of their corresponding `.ll` files.
+The script will generate four subdirectories in the `unit-tests` directory. The `ll_{files,functions}` directories hold the original unit tests and the unit tests with each individual function extracted into its own file, respectively. The `bc_{files,functions}` directories hold the compiled results of their corresponding `.ll` files.
 
 ## Building FLUX
 
